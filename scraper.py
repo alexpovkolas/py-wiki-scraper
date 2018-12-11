@@ -1,7 +1,11 @@
 from html.parser import HTMLParser
 from urllib.request import urlopen
 from urllib import parse
-import numpy as nm
+from igraph import *
+import matplotlib.pyplot as plt
+import numpy as np
+
+
 
 
 class LinkParser(HTMLParser):
@@ -31,18 +35,40 @@ class LinkParser(HTMLParser):
     def filter_page(l):
         return l.startswith("https://en.wikipedia.org/wiki")
 
-def spider(url, maxPages):
-    pagesToVisit = [url]
-    number_visited = 0
 
-    while number_visited < maxPages and pagesToVisit != []:
+def spider(url, maxPages):
+    pages_to_visit = [url]
+    number_visited = 0
+    g = Graph()
+
+
+    while number_visited < maxPages and pages_to_visit != []:
         number_visited = number_visited + 1
-        url = pagesToVisit[0]
-        number_visited = pagesToVisit[1:]
+        url = pages_to_visit[0]
+        pages_to_visit = pages_to_visit[1:]
+        g.add_vertex(url)
         try:
             print(number_visited, "Visiting:", url)
             parser = LinkParser()
             links = parser.getLinks(url)
-            pagesToVisit = pagesToVisit + links
+            for link in links:
+                g.add_vertex(link)
+                g.add_edge(url, link)
+            pages_to_visit = pages_to_visit + links
         except ValueError as err:
             print(" **Failed!**" + str(err))
+
+    page_rank = g.pagerank()
+    degree = g.degree()
+
+    g.degree_distribution()
+
+    plt.hist(page_rank, density=True, log=True)
+    plt.title('Histogram of PageRank')
+    plt.ylabel('Probability')
+    plt.show()
+
+    plt.hist(degree, density=True, log=True)
+    plt.title('Histogram of page degree')
+    plt.ylabel('Probability')
+    plt.show()
