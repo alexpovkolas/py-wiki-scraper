@@ -3,10 +3,6 @@ from urllib.request import urlopen
 from urllib import parse
 from igraph import *
 import matplotlib.pyplot as plt
-import numpy as np
-
-
-
 
 class LinkParser(HTMLParser):
 
@@ -14,26 +10,25 @@ class LinkParser(HTMLParser):
         if tag == 'a':
             for (key, value) in attrs:
                 if key == 'href':
-                    newUrl = parse.urljoin(self.baseUrl, value)
-                    self.links = self.links + [newUrl]
+                    if LinkParser.filter_page(value):
+                        self.links.append(value)
 
 
     def getLinks(self, url):
         self.links = []
-        self.baseUrl = url
-        response = urlopen(url)
+        response = urlopen(parse.urljoin("https://en.wikipedia.org", url))
 
         if response.getheader('Content-Type') and response.getheader('Content-Type').startswith('text/html'):
             htmlBytes = response.read()
             htmlString = htmlBytes.decode("utf-8")
             self.feed(htmlString)
-            return list(filter(LinkParser.filter_page, self.links))
+            return self.links
         else:
             return []
 
     @staticmethod
     def filter_page(l):
-        return l.startswith("https://en.wikipedia.org/wiki")
+        return l.startswith("/wiki") and ":" not in l # auxiliary pages have : inside the url
 
 
 def spider(url, maxPages):
@@ -41,12 +36,12 @@ def spider(url, maxPages):
     number_visited = 0
     g = Graph()
 
-
     while number_visited < maxPages and pages_to_visit != []:
         number_visited = number_visited + 1
         url = pages_to_visit[0]
+        g.add_vertex(pages_to_visit[0])
         pages_to_visit = pages_to_visit[1:]
-        g.add_vertex(url)
+
         try:
             print(number_visited, "Visiting:", url)
             parser = LinkParser()
@@ -54,7 +49,7 @@ def spider(url, maxPages):
             for link in links:
                 g.add_vertex(link)
                 g.add_edge(url, link)
-            pages_to_visit = pages_to_visit + links
+            pages_to_visit.extend(links)
         except ValueError as err:
             print(" **Failed!**" + str(err))
 
