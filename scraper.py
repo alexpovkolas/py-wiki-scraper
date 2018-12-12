@@ -53,8 +53,6 @@ def worker(i, graph):
             break
 
         visited.add(item)
-        #g.add_vertex(item)
-        print(i, "Visiting:", item)
         print(next(counter), i, "Visiting:", item)
         parser = LinkParser()
         links = parser.getLinks(item)
@@ -62,8 +60,6 @@ def worker(i, graph):
         graph[item] = links
         for l in links:
             urls_q.put_nowait(l)
-            #g.add_vertex(l)
-            #g.add_edge(item, l)
 
         tasks.task_done()
 
@@ -94,16 +90,16 @@ def spider(url, maxPages):
     print("--- %s parsing seconds ---" % (time.time() - start_time))
 
     start_time = time.time()
+    for vert, out_vert in graph.items():
+        visited.update(out_vert)
     g = Graph()
     g.add_vertices(iter(visited))
+
+    count = 0
     for vert, out_vert in graph.items():
-        g.add_vertices(out_vert)
+        print("Adding :", count, "/", len(visited), vert)
+        count = count + 1
         g.add_edges([(vert, v) for v in out_vert])
-        #for v in out_vert:
-        #    g.add_edge(vert, v)
-        #edges = [(vert, v) for v in out_vert]
-        #g.add_edges(edges)
-        #[g.add_edge(vert, v) for v in out_vert]
 
 
     print("--- %s graph creation seconds ---" % (time.time() - start_time))

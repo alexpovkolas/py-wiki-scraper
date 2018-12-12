@@ -8,7 +8,7 @@ def do():
                "/wiki/United_States_Senate", "/wiki/White_supremacist",
                "/wiki/African_Americans", "/wiki/Red_Shirts_(United_States)",
                "/wiki/South_Carolina_gubernatorial_election,_1876"]
-    spider(starter, 10000)
+    spider(starter, 1000)
 
 
 do()
