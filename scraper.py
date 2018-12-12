@@ -3,6 +3,10 @@ from urllib.request import urlopen
 from urllib import parse
 from igraph import *
 import matplotlib.pyplot as plt
+import queue
+import itertools
+import threading
+import time
 
 class LinkParser(HTMLParser):
 
@@ -12,7 +16,6 @@ class LinkParser(HTMLParser):
                 if key == 'href':
                     if LinkParser.filter_page(value):
                         self.links.append(value)
-
 
     def getLinks(self, url):
         self.links = []
@@ -31,30 +34,87 @@ class LinkParser(HTMLParser):
         return l.startswith("/wiki") and ":" not in l # auxiliary pages have : inside the url
 
 
+urls_q = queue.Queue()
+tasks = queue.Queue()
+visited = set()
+counter = itertools.count()
+
+
+def worker(i, graph):
+    while True:
+        item = urls_q.get_nowait()
+        if item is None:
+            continue
+        if item in visited:
+            continue
+
+        task = tasks.get()
+        if task is None:
+            break
+
+        visited.add(item)
+        #g.add_vertex(item)
+        print(i, "Visiting:", item)
+        print(next(counter), i, "Visiting:", item)
+        parser = LinkParser()
+        links = parser.getLinks(item)
+        urls_q.task_done()
+        graph[item] = links
+        for l in links:
+            urls_q.put_nowait(l)
+            #g.add_vertex(l)
+            #g.add_edge(item, l)
+
+        tasks.task_done()
+
+
 def spider(url, maxPages):
-    pages_to_visit = [url]
-    number_visited = 0
+    start_time = time.time()
+    for u in url:
+        urls_q.put(u)
+    for p in range(maxPages):
+        tasks.put(p)
+
+    threads = []
+    graph = dict()
+    for i in range(len(url)):
+        t = threading.Thread(target=worker, args=[i, graph])
+        t.start()
+        threads.append(t)
+
+    # block until all tasks are done
+    tasks.join()
+
+    # stop workers
+    for i in range(len(url)):
+        tasks.put(None)
+    for t in threads:
+        t.join(timeout=0.1)
+
+    print("--- %s parsing seconds ---" % (time.time() - start_time))
+
+    start_time = time.time()
     g = Graph()
+    g.add_vertices(iter(visited))
+    for vert, out_vert in graph.items():
+        g.add_vertices(out_vert)
+        g.add_edges([(vert, v) for v in out_vert])
+        #for v in out_vert:
+        #    g.add_edge(vert, v)
+        #edges = [(vert, v) for v in out_vert]
+        #g.add_edges(edges)
+        #[g.add_edge(vert, v) for v in out_vert]
 
-    while number_visited < maxPages and pages_to_visit != []:
-        number_visited = number_visited + 1
-        url = pages_to_visit[0]
-        g.add_vertex(pages_to_visit[0])
-        pages_to_visit = pages_to_visit[1:]
 
-        try:
-            print(number_visited, "Visiting:", url)
-            parser = LinkParser()
-            links = parser.getLinks(url)
-            for link in links:
-                g.add_vertex(link)
-                g.add_edge(url, link)
-            pages_to_visit.extend(links)
-        except ValueError as err:
-            print(" **Failed!**" + str(err))
+    print("--- %s graph creation seconds ---" % (time.time() - start_time))
 
+    start_time = time.time()
     page_rank = g.pagerank()
+    print("--- %s page rank seconds ---" % (time.time() - start_time))
+
+    start_time = time.time()
     degree = g.degree()
+    print("--- %s degree seconds ---" % (time.time() - start_time))
 
     g.degree_distribution()
 
@@ -67,3 +127,4 @@ def spider(url, maxPages):
     plt.title('Histogram of page degree')
     plt.ylabel('Probability')
     plt.show()
+
